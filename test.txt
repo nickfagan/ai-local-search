@@ -1,0 +1,13 @@
+
+Column weights:
+
+1 1 1 1
+
+Set covering (0,1)-matrix:
+
+1100
+1100
+1010
+0111
+0001
+

@@ -180,6 +180,7 @@ void runAlgo(int **matrix, int *weights, int *sortedWeights, int cols, int rows)
       best = s;
     }
    
+    delete[] s;
   }
 
   cout << "Best soln: ";

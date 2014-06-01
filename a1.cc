@@ -27,73 +27,29 @@ int* getIntArray(string s, int count, int &size) {
   return array;
 }
 
-void printArray(int *array, int size) {
+void printArraySpaced(int *array, int size) {
   for(int i = 0; i < size; i++) {
     cout << array[i] << " ";
   }
   cout << endl;
 }
 
-int* getInitialAssignment(int cols) {
-  int *array = new int[cols];
-  for(int i = 0; i < cols; i++) {
-    array[i] = rand() % 2;
+void printArray(int *array, int size) {
+  for(int i = 0; i < size; i++) {
+    cout << array[i];
   }
-
-  //cout << "Initial Assignment:" << endl;
-  //printArray(array, cols);
-  //cout << endl;
-
-  return array;
+  cout << endl;
 }
 
-int calcCost(int **matrix, int *weights, int *sortedWeights, int* n, int cols, int rows) {
-  int cost = 0;
-  int *rowsAssigned = new int[rows];
-
-  for(int i = 0; i < rows; i++) {
-    rowsAssigned[i] = 0;
-  }
-
+void copyArray(int *a, int *b, int cols) {
   for(int i = 0; i < cols; i++) {
-    if(n[i] == 1) {
-      cost += weights[i];
-      
-      for(int j = 0; j < rows; j++) {
-        if(matrix[j][i] == 1) {
-          rowsAssigned[j] = 1;
-        }
-      }
-    }
+    a[i] = b[i];
   }
-
-  int unassigned = rows;
-  for(int i = 0; i < rows; i++) {
-    unassigned -= rowsAssigned[i];
-  }
-
-  cost += unassigned;
-  for(int i = 0; i < unassigned && i < cols; i++) {
-    cost += sortedWeights[cols - 1 - i];
-  }
-
-  delete[] rowsAssigned;
-
-  return cost;
-}
-
-int* getRandNeighbour(int **matrix, int *weights, int *sortedWeights, int* s, int cols, int rows) {
-
-  int randCol = rand() % cols;
-  s[randCol] = (s[randCol] + 1) % 2;
-
-  return s;
 }
 
 bool inTabuList(list<int*> tabuList, int *array, int cols) {
   list<int*>::iterator it;
   for(it = tabuList.begin(); it != tabuList.end(); ++it) {
-
     bool isEqual = true;
     for(int j = 0; j < cols; j++) {
       if((*it)[j] != array[j]) {
@@ -108,10 +64,80 @@ bool inTabuList(list<int*> tabuList, int *array, int cols) {
   return false;
 }
 
+/* Get a random assignment of columns */
+int* getRandInitialAssignment(int cols) {
+  int *array = new int[cols];
+  for(int i = 0; i < cols; i++) {
+    array[i] = rand() % 2;
+  }
+
+  return array;
+}
+
+/* Get a random assignment of columns */
+int* getInitialAssignment(int **matrix, int *weights, int maxIndex, int cols, int rows) {
+  int *array = getRandInitialAssignment(cols);
+  array[maxIndex] = 1;
+  return array;
+}
+
+/* Calculates the cost of an assignment n, heres how the cost function works:
+	1.) For all columns picked in n added the weight of the column to cost
+	2.) Get the number of rows that have NO 1's in them 
+	3.) Add the weights of the highest column weights to cost for the number of rows not assigned
+	4.) Add the number of unassigned rows to cost 
+  This cost function will favour assignments were all rows have ones in them over assignemnts
+  that have rows not assigned, ei it would be more cost effective to pick more columns that limit the number
+  of unassigned rows. Basically, we want the cost of assignments with unassign rows to be very high so the
+  algo doesnt pick em unless it has to. */
+int calcCost(int **matrix, int *weights, int *sortedWeights, int* n, int cols, int rows) {
+  int cost = 0;
+  int *rowsAssigned = new int[rows];
+
+  for(int i = 0; i < rows; i++) {
+    rowsAssigned[i] = 0;
+  }
+
+  /* Add the weights to the cost and find unassigned rows */
+  for(int i = 0; i < cols; i++) {
+    if(n[i] == 1) {
+      cost += weights[i];
+      
+      for(int j = 0; j < rows; j++) {
+        if(matrix[j][i] == 1) {
+          rowsAssigned[j] = 1;
+        }
+      }
+    }
+  }
+
+  /* Find the number of unassigned rows */
+  int unassigned = rows;
+  for(int i = 0; i < rows; i++) {
+    unassigned -= rowsAssigned[i];
+  }
+
+  /* Added heighest weights for ever unassigned row */
+  for(int i = 0; i < unassigned && i < cols; i++) {
+    cost += sortedWeights[cols - 1];
+  }
+  if(unassigned > 0) cost += 1;
+
+  delete[] rowsAssigned;
+
+  return cost;
+}
+
+/* Gets the best neighbour of s, heres how the neighbourhood function works:
+	1.) Get a list of ALL possible neightbours by flipping the bits of s (eg s = 0110 neightbours: {1110, 0010, 0100, 0111}) 
+	2.) Calculate the cost of all the neighbours
+	3.) Find the min cost, ignoring those that are in the tabu list
+	4.) return the lowest cost neighbour */
 int* getBestNeighbour(list<int*> tabuList, int **matrix, int *weights, int *sortedWeights, int* s, int cols, int rows) {
   int **neighbours = new int*[cols];
   int *cost = new int[cols];
 
+  /* Create all neighbours and their costs */
   for(int i = 0; i < cols; i++) {
     neighbours[i] = new int[cols];
 
@@ -123,6 +149,7 @@ int* getBestNeighbour(list<int*> tabuList, int **matrix, int *weights, int *sort
     cost[i] = calcCost(matrix, weights, sortedWeights, neighbours[i], cols, rows);
   }
 
+  /* Find the min cost neighbour */
   int minCost = INT_MAX;
   int minIndex;
   for(int i = 0; i < cols; i++) {
@@ -132,19 +159,9 @@ int* getBestNeighbour(list<int*> tabuList, int **matrix, int *weights, int *sort
     }
   }
 
-/*
-  cout << "Neighbours:" << endl;
+  /* Copy min cost neighbour into s */
   for(int i = 0; i < cols; i++) {
-    for(int j = 0; j < cols; j++) {
-      cout << neighbours[i][j] << " ";
-    }
-    cout << "cost: " << cost[i] << endl;
-  }
-  cout << endl;
-*/
-
-  for(int i = 0; i < cols; i++) {
-    s[i] = neighbours[minIndex][i];
+    copyArray(s, neighbours[minIndex], cols);
   }
 
   for(int i = 0; i < cols; i++) {
@@ -157,33 +174,38 @@ int* getBestNeighbour(list<int*> tabuList, int **matrix, int *weights, int *sort
   return s;
 }
 
-void runAlgo(int **matrix, int *weights, int *sortedWeights, int cols, int rows) {
+/* Local Search Algorithm */
+void runAlgo(int **matrix, int maxIndex, int *weights, int *sortedWeights, int cols, int rows) {
   list<int*> tabuList;
   int *best = NULL;
 
-  for(int i = 0; i < 100; i++) {
-    int* s = getInitialAssignment(cols);
+  for(int i = 0; i < 10; i++) {
+    int* s = getInitialAssignment(matrix, weights, maxIndex, cols, rows);
+
+    if(best == NULL) {
+      best = new int[cols];				// Very first iteration, need to set best to something
+      copyArray(best, s, cols);
+    }
 
     for(int j = 0; j < 1000; j++) {
-      int* r = getBestNeighbour(tabuList, matrix, weights, sortedWeights, s, cols, rows);
+      int* r = getBestNeighbour(tabuList, matrix, weights, sortedWeights, s, cols, rows);	// Get the best cost neighbour that isnt in the tabu list
       int rCost = calcCost(matrix, weights, sortedWeights, r, cols, rows);
-      int sCost = calcCost(matrix, weights, sortedWeights, s, cols, rows);
+      int bestCost = calcCost(matrix, weights, sortedWeights, best, cols, rows);
 
-      if(rCost - sCost < 0) {
-        tabuList.push_front(r);
-        if(tabuList.size() > 20) tabuList.pop_back();
-        s = r;
+      if(rCost - bestCost < 0) {			// If we found a better assignment then the best so far
+        cout << "New best: " << rCost << endl;
+        copyArray(best, r, cols);
       }
-    }
 
-    if(best == NULL || calcCost(matrix, weights, sortedWeights, s, cols, rows) - calcCost(matrix, weights, sortedWeights, best, cols, rows) < 0) {
-      best = s;
+      tabuList.push_front(r);				// Add this assignment to the tabu list so we dont repeat it
+      if(tabuList.size() > 20) tabuList.pop_back();	// Keep a tabu list size of 20
+      copyArray(s, r, cols);
     }
-   
   }
 
   cout << "Best soln: ";
   printArray(best, cols);
+  cout << "Cost: " << calcCost(matrix, weights, sortedWeights, best, cols, rows) << endl;
 
 }
 
@@ -234,31 +256,53 @@ int main(int argc, char* argv[]) {
   for(int i = 0; i < cols; i++) sortedWeights[i] = weights[i]; 
   sort(sortedWeights, sortedWeights + cols);
 
+  cout << "Columns: " << cols << ", Rows: " << rows << endl;
+
   cout << "Weights:" << endl;
-  printArray(weights, cols);
+  printArraySpaced(weights, cols);
   cout << endl;
 
   cout << "Sorted Weights:" << endl;
-  printArray(sortedWeights, cols);
+  printArraySpaced(sortedWeights, cols);
   cout << endl;
+
+  int *col1Count = new int[cols];
+  for(int i = 0; i < cols; i++) col1Count[i] = 0;
 
   for(int i = 0; i < rows; i++) {
     matrix[i] = new int[cols];
 
     for(int j = 0; j < cols; j++) {
+      //cout << "i: " << i << ", j: " << j << endl;
       int index = i * cols + j;
       string integer = strMatrix.substr(index, 1);
       matrix[i][j] = atoi(integer.c_str());
+      col1Count[j] += matrix[i][j];
     }
   }
 
-  cout << "Matrix:" << endl;
-  for(int i = 0; i < rows; i++) {
-    printArray(matrix[i], cols);
+  int max = INT_MIN;
+  int maxIndex;
+  for(int i = 0; i < cols; i++) {
+    if(col1Count[i] > max) {
+      max = col1Count[i];
+      maxIndex = i;
+    }
   }
+
+  cout << "Column 1 counts:" << endl;
+  printArraySpaced(col1Count, cols);
   cout << endl;
 
-  runAlgo(matrix, weights, sortedWeights, cols, rows);
+  cout << "Max index: " << maxIndex << endl;
+
+//  cout << "Matrix:" << endl;
+//  for(int i = 0; i < rows; i++) {
+//    printArray(matrix[i], cols);
+//  }
+//  cout << endl;
+
+  runAlgo(matrix, maxIndex, weights, sortedWeights, cols, rows);
 
   delete[] weights;
   delete[] sortedWeights;
